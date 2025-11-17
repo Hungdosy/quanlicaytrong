@@ -5,6 +5,7 @@ using HomeGarden.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Security.Claims;
 
 namespace HomeGarden.Controllers
 {
@@ -178,5 +179,43 @@ namespace HomeGarden.Controllers
 
             return ApiResponse.Success("Đã xóa cây thành công");
         }
+
+        [HttpGet("me")]
+        public IActionResult Me()
+        {
+            var claims = User.Claims.Select(c => new { c.Type, c.Value });
+            return Ok(new
+            {
+                IsAuth = User.Identity?.IsAuthenticated,
+                Name = User.Identity?.Name,
+                Roles = User.Claims.Where(c => c.Type == ClaimTypes.Role || c.Type == "role").Select(c => c.Value).ToList(),
+                NameId = User.Claims.FirstOrDefault(c => c.Type == ClaimTypes.NameIdentifier)?.Value,
+                Sub = User.Claims.FirstOrDefault(c => c.Type == "sub")?.Value,
+                Uid = User.Claims.FirstOrDefault(c => c.Type == "uid" || c.Type == "user_id")?.Value,
+                All = claims
+            });
+        }
+        [HttpGet("debug")]
+        public async Task<IActionResult> DebugDb()
+        {
+            var conn = _db.Database.GetDbConnection();
+            var uid = CurrentUserId ?? -1;
+
+            var totalForUser = await _db.Plants
+                .Include(p => p.Area)
+                .CountAsync(p => (p.IsDeleted == false || p.IsDeleted == null)
+                                 && p.Area.UserId == uid);
+
+            var totalAll = await _db.Plants.CountAsync();
+
+            return Ok(new
+            {
+                uid,
+                db = new { conn.Database, conn.DataSource },
+                totals = new { totalAll, totalForUser }
+            });
+        }
+
+
     }
 }

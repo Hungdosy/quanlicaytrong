@@ -1,8 +1,138 @@
 ﻿@{
-    ViewData["Title"] = "Home Page";
+    ViewData["Title"] = "HomeGarden – Quản lý cây trồng tại nhà";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://learn.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
+<!-- HERO -->
+<section class="relative">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="grid lg:grid-cols-2 gap-10 items-center py-14 lg:py-20">
+            <div>
+                <h1 class="text-4xl/tight sm:text-5xl/tight font-extrabold">
+                    Quản lý vườn nhà <span class="text-brand">thông minh</span> & dễ dùng
+                </h1>
+                <p class="mt-4 text-lg text-gray-600 dark:text-gray-300">
+                    Theo dõi sức khỏe cây, lịch tưới – bón, cảnh báo sâu bệnh và ghi chép tăng trưởng ngay trên điện thoại & web.
+                </p>
+                <div class="mt-6 flex flex-wrap gap-3">
+                    <a class="px-5 py-3 rounded-xl bg-brand text-white hover:bg-emerald-600" href="@Url.Action("Register", "Auth")">Bắt đầu miễn phí</a>
+                    <a class="px-5 py-3 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800" href="@Url.Action("Login", "Auth")">Đăng nhập</a>
+                </div>
+                <div class="mt-5 inline-flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                    <span class="px-2 py-0.5 rounded bg-brand/10 text-brand">Không giới hạn số cây</span>
+                    <span>•</span> Lưu trữ lịch sử & ảnh
+                </div>
+            </div>
+            <div class="relative">
+                <div class="rounded-2xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 p-4 shadow-sm">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="space-y-4">
+                            <div class="p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30">
+                                <div class="text-sm text-gray-600 dark:text-gray-300">Độ ẩm đất</div>
+                                <div class="text-3xl font-bold text-brand">46%</div>
+                                <div class="text-xs text-gray-500">Vừa tưới 2 giờ trước</div>
+                            </div>
+                            <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30">
+                                <div class="text-sm text-gray-600 dark:text-gray-300">Nhắc bón phân</div>
+                                <div class="text-base">Cây Trầu bà – 3 ngày nữa</div>
+                            </div>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="p-4 rounded-xl bg-sky-50 dark:bg-sky-950/30">
+                                <div class="text-sm text-gray-600 dark:text-gray-300">Lịch tưới hôm nay</div>
+                                <div class="text-base">Xương rồng, Sen đá, Trầu bà</div>
+                            </div>
+                            <div class="p-4 rounded-xl bg-gray-50 dark:bg-gray-800">
+                                <div class="text-sm text-gray-600 dark:text-gray-300">Ảnh theo dõi</div>
+                                <div class="mt-2 grid grid-cols-3 gap-2">
+                                    <div class="h-16 rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+                                    <div class="h-16 rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+                                    <div class="h-16 rounded-lg bg-gray-200 dark:bg-gray-700"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">* Ảnh mockup — bạn có thể thay bằng screenshot thực tế</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features" class="py-14 lg:py-20 border-t border-gray-100 dark:border-gray-800">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-2xl mx-auto">
+            <h2 class="text-3xl font-bold">Mọi thứ bạn cần cho khu vườn nhỏ</h2>
+            <p class="mt-3 text-gray-600 dark:text-gray-300">Theo dõi – Nhắc việc – Cảnh báo – Ghi chép – Phân tích</p>
+        </div>
+        <div class="mt-8 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            <div class="p-5 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <div class="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3">
+                    <svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M5.5 1a.5.5 0 0 1 .5.5V3h4V1.5a.5.5 0 0 1 1 0V3h1a2 2 0 0 1 2 2v2H1V5a2 2 0 0 1 2-2h1V1.5a.5.5 0 0 1 .5-.5z" /><path d="M1 9h14v2a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V9z" /></svg>
+                </div>
+                <h3 class="font-semibold">Lịch tưới & bón</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Nhắc tưới/bón theo chu kỳ riêng từng cây.</p>
+            </div>
+            <div class="p-5 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <div class="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3">
+                    <svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6z" /><path d="M14 14s-1-1.5-6-1.5S2 14 2 14s1-4 6-4 6 4 6 4z" /></svg>
+                </div>
+                <h3 class="font-semibold">Sức khỏe cây</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Theo dõi tình trạng, gợi ý xử lý sâu bệnh.</p>
+            </div>
+            <div class="p-5 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <div class="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3">
+                    <svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M0 2a2 2 0 0 1 2-2h2.5L6.5 2H14a2 2 0 0 1 2 2v1H0V2z" /><path d="M0 5h16v7a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V5z" /></svg>
+                </div>
+                <h3 class="font-semibold">Nhật ký & ảnh</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Ghi chép tưới/bón/đo ẩm, đính kèm ảnh.</p>
+            </div>
+            <div class="p-5 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <div class="w-10 h-10 rounded-lg bg-brand/10 text-brand flex items-center justify-center mb-3">
+                    <svg class="w-5 h-5" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4a2 2 0 0 1 2-2h9l5 5v7a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2V4z" /><path d="M9.5 5V2.5L14 7h-2.5A2 2 0 0 1 9.5 5z" /></svg>
+                </div>
+                <h3 class="font-semibold">Cảnh báo</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Thông báo khi quá lịch tưới hoặc độ ẩm thấp.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section id="how" class="py-14 lg:py-20">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div class="text-center max-w-2xl mx-auto">
+            <h2 class="text-3xl font-bold">Bắt đầu trong 3 bước</h2>
+        </div>
+        <div class="mt-8 grid md:grid-cols-3 gap-5">
+            <div class="p-6 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <span class="px-2 py-1 rounded bg-brand/10 text-brand text-sm">Bước 1</span>
+                <h3 class="mt-3 font-semibold">Tạo tài khoản</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Đăng ký nhanh, xác nhận email (tùy chọn).</p>
+            </div>
+            <div class="p-6 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <span class="px-2 py-1 rounded bg-brand/10 text-brand text-sm">Bước 2</span>
+                <h3 class="mt-3 font-semibold">Thêm cây & khu vực</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Đặt chu kỳ tưới/bón theo từng loài.</p>
+            </div>
+            <div class="p-6 rounded-2xl border border-gray-200 dark:border-gray-800">
+                <span class="px-2 py-1 rounded bg-brand/10 text-brand text-sm">Bước 3</span>
+                <h3 class="mt-3 font-semibold">Nhận nhắc việc tự động</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-300 mt-1">Duy trì chăm cây ổn định & khoa học.</p>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- CTA -->
+<section id="cta" class="py-14 lg:py-20 bg-brand/5">
+    <div class="mx-auto max-w-4xl px-4 sm:px-6 lg:px-8 text-center">
+        <h2 class="text-3xl font-bold">Sẵn sàng chăm vườn bài bản?</h2>
+        <p class="mt-3 text-gray-600 dark:text-gray-300">Tham gia HomeGarden miễn phí — thêm cây chỉ trong 1 phút.</p>
+        <div class="mt-6 flex flex-wrap items-center justify-center gap-3">
+            <a class="px-5 py-3 rounded-xl bg-brand text-white hover:bg-emerald-600" href="@Url.Action("Register", "Auth")">Tạo tài khoản</a>
+            <a class="px-5 py-3 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800" href="@Url.Action("Login", "Auth")">Đăng nhập</a>
+        </div>
+        <div class="mt-3 text-sm text-gray-500 dark:text-gray-400">Không yêu cầu thẻ tín dụng</div>
+    </div>
+</section>

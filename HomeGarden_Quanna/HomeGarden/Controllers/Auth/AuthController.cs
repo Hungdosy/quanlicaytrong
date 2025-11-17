@@ -48,26 +48,30 @@ namespace HomeGarden.Controllers.Auth
 
         [HttpPost("login")]
         [AllowAnonymous]
-        public async Task<ActionResult<LoginResponseDto>> Login([FromBody] LoginDto dto)
+        public async Task<IActionResult> Login([FromBody] LoginDto dto)
         {
             var user = await _db.Users
                 .Include(u => u.Role)
                 .Include(u => u.Status)
                 .FirstOrDefaultAsync(u => u.Email == dto.Email);
-            if (user == null || !BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
-                return Unauthorized("Sai email hoặc mật khẩu");
+
+            if (user == null)
+                return NotFound("Tài khoản không tồn tại trong hệ thống.");
+
+            if (!BCrypt.Net.BCrypt.Verify(dto.Password, user.PasswordHash))
+                return Unauthorized("Sai mật khẩu. Vui lòng kiểm tra lại.");
 
             if (user.Status.Code != "Active")
-                return Forbid("Tài khoản chưa ở trạng thái Active");
+                return Forbid("Tài khoản của bạn chưa được kích hoạt hoặc đã bị khóa.");
 
             var token = GenerateJwtToken(user);
-            return new LoginResponseDto
+            return Ok(new LoginResponseDto
             {
                 Token = token,
                 UserId = user.UserId,
                 Fullname = user.Fullname,
                 Role = user.Role.RoleName
-            };
+            });
         }
 
         [HttpGet("profile")]

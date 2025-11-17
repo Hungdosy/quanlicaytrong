@@ -1,0 +1,185 @@
+﻿@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Chỉnh sửa cây trồng";
+}
+
+<div class="mx-auto max-w-3xl px-4 py-8">
+    <h1 class="text-2xl font-bold mb-6">🌿 Chỉnh sửa cây trồng</h1>
+
+    <form id="editForm" class="space-y-4">
+        <input type="hidden" id="plantId" value="@ViewData["Id"]" />
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Khu vực</label>
+            <select id="areaId" class="form-select w-full"></select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Tên cây</label>
+                <input id="name" type="text" class="form-input w-full" required />
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Giống</label>
+                <input id="species" type="text" class="form-input w-full" />
+            </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium mb-1">Ngày trồng</label>
+                <input id="plantedDate" type="date" class="form-input w-full" />
+            </div>
+            <div>
+                <label class="block text-sm font-medium mb-1">Sức khỏe</label>
+                <select id="healthId" class="form-select w-full"></select>
+            </div>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Trạng thái</label>
+            <select id="statusId" class="form-select w-full"></select>
+        </div>
+
+        <div>
+            <label class="block text-sm font-medium mb-1">Ghi chú</label>
+            <textarea id="notes" rows="3" class="form-input w-full"></textarea>
+        </div>
+
+        <div class="flex justify-end gap-3 pt-2">
+            <a href="/App" class="btn-secondary">← Quay lại</a>
+            <button type="submit" class="btn-primary">💾 Lưu thay đổi</button>
+        </div>
+
+        <p id="msg" class="text-sm mt-2"></p>
+    </form>
+</div>
+
+@section Scripts {
+    <script>
+        const API_BASE = "https://localhost:7120/api";
+        const $ = id => document.getElementById(id);
+
+        const healthOptions = [
+            { id: 1, code: "Good", desc: "Tốt 🌿" },
+            { id: 2, code: "Average", desc: "Trung bình 🌾" },
+            { id: 3, code: "Poor", desc: "Kém 🍂" },
+            { id: 4, code: "Wilted", desc: "Héo 🥀" },
+            { id: 5, code: "Yellow", desc: "Vàng lá 💛" }
+        ];
+        const statusOptions = [
+            { id: 6, code: "Growing", desc: "Đang phát triển 🌱" },
+            { id: 7, code: "Harvested", desc: "Đã thu hoạch 🧺" },
+            { id: 8, code: "Dead", desc: "Đã chết ⚰️" }
+        ];
+
+        function getToken() {
+            return localStorage.getItem("hg_token") || sessionStorage.getItem("hg_token");
+        }
+        function headers() {
+            const t = getToken();
+            return { "Accept": "application/json", "Content-Type": "application/json", ...(t ? { Authorization: "Bearer " + t } : {}) };
+        }
+        async function fetchJson(url, opt = {}) {
+            try {
+                const res = await fetch(url, { ...opt, headers: headers() });
+                const body = await res.json().catch(() => ({}));
+                return { ok: res.ok, data: body.data ?? body, message: body.message ?? "" };
+            } catch {
+                return { ok: false, message: "Không thể kết nối máy chủ." };
+            }
+        }
+
+        function loadDropdowns() {
+            $("healthId").innerHTML = healthOptions.map(h =>
+                `<option value="${h.id}" data-code="${h.code}">${h.desc}</option>`).join("");
+            $("statusId").innerHTML = statusOptions.map(s =>
+                `<option value="${s.id}" data-code="${s.code}">${s.desc}</option>`).join("");
+        }
+
+        async function loadAreas() {
+            const { ok, data } = await fetchJson(`${API_BASE}/areas`);
+            const sel = $("areaId");
+            if (ok && Array.isArray(data))
+                sel.innerHTML = data.map(a => `<option value="${a.areaId}">${a.name}</option>`).join("");
+            else sel.innerHTML = `<option value="">(Không tải được khu vực)</option>`;
+        }
+
+        async function loadPlant(id) {
+            const { ok, data } = await fetchJson(`${API_BASE}/plants/${id}`);
+            if (!ok || !data) {
+                $("msg").textContent = "❌ Không tải được thông tin cây.";
+                $("msg").className = "text-sm text-red-600";
+                return;
+            }
+
+            $("areaId").value = data.areaId ?? "";
+            $("name").value = data.name ?? "";
+            $("species").value = data.species ?? "";
+            $("plantedDate").value = data.plantedDate ? data.plantedDate.split("T")[0] : "";
+            $("notes").value = data.notes ?? "";
+
+            // Match code → dropdown item có data-code trùng
+            $("healthId").value = healthOptions.find(x => x.code === data.health)?.id ?? "";
+            $("statusId").value = statusOptions.find(x => x.code === data.status)?.id ?? "";
+        }
+
+        $("editForm").addEventListener("submit", async e => {
+            e.preventDefault();
+            const id = $("plantId").value;
+            const body = {
+                areaId: parseInt($("areaId").value) || null,
+                name: $("name").value.trim(),
+                species: $("species").value.trim() || null,
+                plantedDate: $("plantedDate").value ? new Date($("plantedDate").value).toISOString() : null,
+                healthId: parseInt($("healthId").value) || null,
+                statusId: parseInt($("statusId").value) || null,
+                notes: $("notes").value.trim() || null
+            };
+
+            const { ok, message } = await fetchJson(`${API_BASE}/plants/${id}`, {
+                method: "PATCH", body: JSON.stringify(body)
+            });
+
+            $("msg").textContent = ok ? "✅ Cập nhật thành công!" : "❌ " + (message || "Lỗi khi cập nhật");
+            $("msg").className = ok ? "text-sm text-green-600" : "text-sm text-red-600";
+
+            if (ok) setTimeout(() => window.location.href = "/App", 1000);
+        });
+
+        document.addEventListener("DOMContentLoaded", async () => {
+            const id = window.location.pathname.split("/").pop();
+            $("plantId").value = id;
+            loadDropdowns();
+            await loadAreas();
+            await loadPlant(id);
+        });
+    </script>
+}
+
+<style>
+    .form-input, .form-select {
+        border: 1px solid #d1d5db;
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background-color: white;
+    }
+
+    .btn-primary {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        background-color: #10b981;
+        color: white;
+    }
+
+        .btn-primary:hover {
+            background-color: #059669;
+        }
+
+    .btn-secondary {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid #d1d5db;
+    }
+</style>
+//aa

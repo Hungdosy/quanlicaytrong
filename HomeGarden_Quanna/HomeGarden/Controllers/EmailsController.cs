@@ -41,37 +41,76 @@ namespace HomeGarden.Controllers
         }
 
         // 🔹 POST /api/emails/send
+        // Body:
+        // {
+        //   "userIds": [1,2,3],   // hoặc "userId": 5
+        //   "subject": "Tiêu đề",
+        //   "content": "Nội dung",
+        // }
         [HttpPost("send")]
         public async Task<ActionResult<ApiResponse<string>>> SendEmail([FromBody] EmailSendDto dto)
         {
-            var user = await _db.Users.FirstOrDefaultAsync(u => u.UserId == dto.UserId);
-            if (user == null)
-                return ApiResponse.Fail<string>("Người dùng không tồn tại");
+            // Gom tất cả ID lại (UserId + UserIds)
+            var ids = new List<long>();
+            if (dto.UserIds != null && dto.UserIds.Any())
+                ids.AddRange(dto.UserIds);
+            if (dto.UserId.HasValue)
+                ids.Add(dto.UserId.Value);
 
-            try
+            ids = ids.Distinct().ToList();
+
+            if (!ids.Any())
+                return ApiResponse.Fail<string>("Chưa chọn người nhận");
+
+            if (string.IsNullOrWhiteSpace(dto.Subject) || string.IsNullOrWhiteSpace(dto.Content))
+                return ApiResponse.Fail<string>("Thiếu tiêu đề hoặc nội dung email");
+
+            var users = await _db.Users
+                .Where(u => ids.Contains(u.UserId))
+                .ToListAsync();
+
+            if (!users.Any())
+                return ApiResponse.Fail<string>("Không tìm thấy người dùng phù hợp");
+
+            var notifications = new List<EmailNotification>();
+
+            foreach (var u in users)
             {
-                // Gửi mail thật qua Gmail SMTP
-                await _emailService.SendAsync(user.Email, dto.Subject, dto.Content);
-
-                // Lưu log vào bảng email_notifications
-                var email = new EmailNotification
+                try
                 {
-                    UserId = dto.UserId,
-                    Subject = dto.Subject,
-                    Content = dto.Content,
-                    Sent = true,
-                    SendTime = DateTime.Now,
-                    SentAt = DateTime.Now
-                };
-                _db.EmailNotifications.Add(email);
-                await _db.SaveChangesAsync();
+                    await _emailService.SendAsync(u.Email, dto.Subject, dto.Content);
 
-                return ApiResponse.Success("Gửi email thành công ✅");
+                    notifications.Add(new EmailNotification
+                    {
+                        UserId = u.UserId,
+                        Subject = dto.Subject,
+                        Content = dto.Content,
+                        Sent = true,
+                        SendTime = DateTime.Now,
+                        SentAt = DateTime.Now,
+                    });
+                }
+                catch
+                {
+                    // Lưu lại cả case fail
+                    notifications.Add(new EmailNotification
+                    {
+                        UserId = u.UserId,
+                        Subject = dto.Subject,
+                        Content = dto.Content,
+                        Sent = false,
+                        SendTime = DateTime.Now,
+                    });
+                }
             }
-            catch (Exception ex)
+
+            if (notifications.Any())
             {
-                return ApiResponse.Fail<string>($"Lỗi khi gửi mail: {ex.Message}");
+                _db.EmailNotifications.AddRange(notifications);
+                await _db.SaveChangesAsync();
             }
+
+            return ApiResponse.Success($"Đã xử lý gửi email cho {users.Count} người dùng.");
         }
     }
 }

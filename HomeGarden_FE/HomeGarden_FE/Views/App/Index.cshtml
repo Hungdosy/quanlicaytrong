@@ -1,0 +1,783 @@
+﻿@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Danh sách cây trồng";
+}
+
+<div class="mx-auto max-w-6xl px-4 py-8">
+    <!-- ======= TIÊU ĐỀ + NÚT THÊM CÂY ======= -->
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">🌿 Danh sách cây trồng</h1>
+        <a href="/App/Create"
+           class="px-4 py-2 rounded-xl bg-brand text-white hover:bg-emerald-600">
+            + Thêm cây
+        </a>
+    </div>
+
+    <!-- ======= SEARCH + SORT ======= -->
+    <div class="flex flex-col sm:flex-row gap-3 mb-4">
+        <input id="searchBox" type="text" placeholder="🔍 Tìm theo tên..."
+               class="form-input flex-1" />
+        <select id="sortSelect" class="form-select w-48">
+            <option value="name_asc">Tên (A → Z)</option>
+            <option value="name_desc">Tên (Z → A)</option>
+            <option value="date_desc">Mới nhất</option>
+            <option value="date_asc">Cũ nhất</option>
+        </select>
+        <button id="btnSearch" class="btn-primary">Tìm kiếm</button>
+    </div>
+
+    <!-- ======= TABLE DANH SÁCH CÂY ======= -->
+    <div class="rounded-2xl border border-gray-200 overflow-hidden bg-white">
+        <table class="min-w-full text-sm divide-y divide-gray-200">
+            <thead class="bg-gray-50 text-xs font-semibold text-gray-600">
+                <tr>
+                    <th class="px-4 py-2 text-left w-10">#</th>
+                    <th class="px-4 py-2 text-left">Tên cây</th>
+                    <th class="px-4 py-2 text-left">Giống</th>
+                    <th class="px-4 py-2 text-left">Sức khỏe</th>
+                    <th class="px-4 py-2 text-left">Trạng thái</th>
+                    <th class="px-4 py-2 text-left">Ngày trồng</th>
+                    <th class="px-4 py-2 text-center w-72">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="plantRows" class="divide-y divide-gray-200"></tbody>
+        </table>
+    </div>
+
+    <!-- ======= PAGINATION ======= -->
+    <div class="flex items-center justify-between mt-4">
+        <div id="plantTotal" class="text-sm text-gray-500">—</div>
+        <div class="flex items-center gap-2">
+            <button id="prevPage" class="btn-secondary">Trước</button>
+            <span id="pageInfo" class="text-sm"></span>
+            <button id="nextPage" class="btn-secondary">Sau</button>
+        </div>
+    </div>
+
+    <!-- ======= LỊCH CHĂM SÓC (CALENDAR) ======= -->
+    <div class="mt-8">
+        <div class="flex items-center justify-between mb-2">
+            <h2 class="text-lg font-semibold">📅 Lịch chăm sóc (tháng này)</h2>
+            <span class="text-xs text-gray-500">
+                • Chấm xanh: có lịch chăm sóc · • Chấm đỏ: có cảnh báo · Nền xanh nhạt: hôm nay
+            </span>
+        </div>
+        <div id="waterCalendar"
+             class="rounded-2xl border border-gray-200 bg-white p-3 text-xs">
+            <div class="text-center text-gray-500 py-4">Đang tải lịch chăm sóc...</div>
+        </div>
+    </div>
+</div>
+
+<!-- ======= DRAWER (PANEL TRƯỢT BÊN PHẢI) ======= -->
+<div id="drawer" class="fixed inset-0 z-50 hidden">
+    <div class="absolute inset-0 bg-black/30" onclick="closeDrawer()"></div>
+    <div class="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl flex flex-col">
+        <div class="flex items-center justify-between p-4 border-b">
+            <h2 id="drawerTitle" class="font-semibold text-lg"></h2>
+            <button onclick="closeDrawer()" class="text-gray-500 hover:text-gray-700 text-xl leading-none">
+                ×
+            </button>
+        </div>
+        <div id="drawerBody" class="p-4 overflow-y-auto text-sm space-y-4"></div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_BASE = "https://localhost:7120/api";
+        const PAGE_SIZE = 5;
+        let curPage = 1;
+        let totalItems = 0;
+        const $ = id => document.getElementById(id);
+
+        // ================== HELPER ==================
+        function getToken() {
+            return localStorage.getItem("hg_token") || sessionStorage.getItem("hg_token");
+        }
+        function headers() {
+            const t = getToken();
+            return {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                ...(t ? { Authorization: "Bearer " + t } : {})
+            };
+        }
+        function fmtDate(iso) {
+            if (!iso) return "—";
+            return new Date(iso).toLocaleDateString("vi-VN");
+        }
+        function fmtTime(iso) {
+            if (!iso) return "";
+            return new Date(iso).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" });
+        }
+        async function fetchJson(url, opt = {}) {
+            try {
+                const res = await fetch(url, { ...opt, headers: headers() });
+                const body = await res.json().catch(() => ({}));
+                return { ok: res.ok, data: body.data ?? body, status: res.status, raw: body };
+            } catch {
+                return { ok: false, data: null, status: 0 };
+            }
+        }
+
+        // ================== LỊCH (CALENDAR TOÀN HỆ THỐNG) ==================
+        async function loadWaterCalendar() {
+            const container = $("waterCalendar");
+            if (!container) return;
+
+            container.innerHTML = `<div class="text-center text-gray-500 py-4">Đang tải lịch chăm sóc...</div>`;
+
+            // Lấy tất cả schedules
+            const schedRes = await fetchJson(`${API_BASE}/schedules`);
+            if (schedRes.status === 401) {
+                container.innerHTML = `<div class="text-center text-red-600 py-4">
+                    ⚠️ Bạn chưa đăng nhập.
+                </div>`;
+                return;
+            }
+            const schedules = Array.isArray(schedRes.data) ? schedRes.data : [];
+
+            // Lấy tất cả alerts (nếu lỗi thì bỏ qua, coi như không có cảnh báo)
+            let alerts = [];
+            const alertRes = await fetchJson(`${API_BASE}/alerts`);
+            if (alertRes.ok && Array.isArray(alertRes.data)) {
+                alerts = alertRes.data;
+            }
+
+            renderCalendar(schedules, alerts);
+        }
+
+        function renderCalendar(schedules, alerts) {
+            const container = $("waterCalendar");
+            if (!container) return;
+
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth(); // 0-11
+
+            // Group dữ liệu theo ngày yyyy-MM-dd cho tháng hiện tại
+            const byDay = {};
+
+            schedules.forEach(s => {
+                if (!s.nextDue) return;
+                const d = new Date(s.nextDue);
+                if (d.getFullYear() !== year || d.getMonth() !== month) return;
+
+                const key = d.toISOString().substring(0, 10);
+                if (!byDay[key]) byDay[key] = { schedules: [], alerts: [] };
+                byDay[key].schedules.push(s);
+            });
+
+            alerts.forEach(a => {
+                if (!a.alertDate) return;
+                const d = new Date(a.alertDate);
+                if (d.getFullYear() !== year || d.getMonth() !== month) return;
+
+                const key = d.toISOString().substring(0, 10);
+                if (!byDay[key]) byDay[key] = { schedules: [], alerts: [] };
+                byDay[key].alerts.push(a);
+            });
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const totalDays = lastDay.getDate();
+
+            // Đưa Monday = 0, Sunday = 6
+            const startWeekDay = (firstDay.getDay() + 6) % 7;
+
+            let html = `
+                <div class="flex items-center justify-between mb-2">
+                    <div class="font-semibold text-xs">
+                        Tháng ${month + 1}/${year}
+                    </div>
+                    <button type="button"
+                        onclick="loadWaterCalendar()"
+                        class="px-2 py-1 rounded-lg border border-gray-200 text-[11px] hover:bg-gray-50">
+                        🔄 Làm mới
+                    </button>
+                </div>
+                <table class="w-full text-[11px] border-collapse">
+                    <thead>
+                        <tr class="text-gray-500">
+                            <th class="px-1 py-1">T2</th>
+                            <th class="px-1 py-1">T3</th>
+                            <th class="px-1 py-1">T4</th>
+                            <th class="px-1 py-1">T5</th>
+                            <th class="px-1 py-1">T6</th>
+                            <th class="px-1 py-1 text-red-500">T7</th>
+                            <th class="px-1 py-1 text-red-500">CN</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+            `;
+
+            let day = 1;
+
+            for (let week = 0; week < 6; week++) {
+                html += `<tr>`;
+                for (let wd = 0; wd < 7; wd++) {
+                    const cellIndex = week * 7 + wd;
+                    if (cellIndex < startWeekDay || day > totalDays) {
+                        html += `<td class="border border-gray-100 h-16 align-top bg-gray-50"></td>`;
+                    } else {
+                        const dateObj = new Date(year, month, day);
+                        const key = dateObj.toISOString().substring(0, 10);
+                        const info = byDay[key] || { schedules: [], alerts: [] };
+                        const hasSchedules = info.schedules.length > 0;
+                        const hasAlerts = info.alerts.length > 0;
+                        const isToday = dateObj.toDateString() === now.toDateString();
+
+                        html += `
+                            <td class="border border-gray-100 align-top px-1 py-1 ${isToday ? "bg-emerald-50" : ""}">
+                                <div class="flex items-center justify-between mb-1">
+                                    <span class="text-[11px] font-semibold">${day}</span>
+                                    <div class="flex gap-1">
+                                        ${hasSchedules ? `<span class="w-2 h-2 rounded-full bg-emerald-500"></span>` : ""}
+                                        ${hasAlerts ? `<span class="w-2 h-2 rounded-full bg-red-500"></span>` : ""}
+                                    </div>
+                                </div>
+                        `;
+
+                        if (hasSchedules || hasAlerts) {
+                            html += `<div class="space-y-0.5 max-h-14 overflow-hidden">`;
+
+                            // Lịch chăm sóc: show tối đa 2 lịch
+                            info.schedules.slice(0, 2).forEach(s => {
+                                html += `
+                                    <div class="truncate">
+                                        <span class="font-medium">${fmtTime(s.nextDue)}</span>
+                                        · #${s.plantId}
+                                    </div>
+                                `;
+                            });
+
+                            // Nếu còn nhiều lịch hơn
+                            if (info.schedules.length > 2) {
+                                html += `
+                                    <div class="text-[10px] text-gray-400">
+                                        +${info.schedules.length - 2} lịch nữa...
+                                    </div>
+                                `;
+                            }
+
+                            // Cảnh báo: chỉ show 1 dòng tổng
+                            if (hasAlerts) {
+                                html += `
+                                    <div class="text-[10px] text-red-600">
+                                        ⚠️ ${info.alerts.length} cảnh báo
+                                    </div>
+                                `;
+                            }
+
+                            html += `</div>`;
+                        } else {
+                            html += `<div class="text-[10px] text-gray-300">Không có lịch</div>`;
+                        }
+
+                        html += `</td>`;
+                        day++;
+                    }
+                }
+                html += `</tr>`;
+                if (day > totalDays) break;
+            }
+
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+        }
+
+        // ================== ALERTS (CẢNH BÁO) ==================
+        async function openAlerts(plantId) {
+            const { ok, data } = await fetchJson(`${API_BASE}/alerts`);
+            const list = Array.isArray(data) ? data.filter(a => a.plantId === plantId) : [];
+
+            let html = `
+                <div class="font-semibold text-base mb-2">⚠️ Cảnh báo của cây #${plantId}</div>
+            `;
+
+            if (list.length === 0) {
+                html += `<div class="text-gray-500 text-sm mb-3">Hiện chưa có cảnh báo nào cho cây này.</div>`;
+            } else {
+                html += `
+                    <div class="space-y-2 mb-4">
+                        ${list.map(a => `
+                            <div class="border border-amber-200 rounded-lg p-2">
+                                <div class="flex justify-between items-center mb-1">
+                                    <div class="font-medium">${a.alertType}</div>
+                                    <span class="text-xs px-2 py-0.5 rounded-full ${a.resolved ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}">
+                                        ${a.resolved ? "Đã xử lý" : "Đang mở"}
+                                    </span>
+                                </div>
+                                <div class="text-xs text-gray-600 mb-1">${a.message}</div>
+                                <div class="flex justify-between items-center text-xs text-gray-400">
+                                    <span>Ngày: ${fmtDate(a.alertDate)}</span>
+                                    ${
+                                        a.resolved
+                                            ? (a.resolvedAt ? `<span>✓ ${fmtDate(a.resolvedAt)}</span>` : "")
+                                            : `
+                                                <button onclick="resolveAlert(${a.alertId}, ${plantId})"
+                                                        class="px-2 py-0.5 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50 text-xs">
+                                                    Đánh dấu đã xử lý
+                                                </button>
+                                              `
+                                    }
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                `;
+            }
+
+            // Form tạo cảnh báo mới
+            html += `
+                <div class="border-t border-gray-200 pt-3 mt-3">
+                    <div class="text-xs font-semibold text-gray-500 mb-2">Tạo cảnh báo mới</div>
+                    <div class="space-y-2">
+                        <input id="alertTypeInput" type="text" class="form-input w-full"
+                               placeholder="Loại cảnh báo (VD: Thiếu nước, Sâu bệnh...)" />
+                        <textarea id="alertMsgInput" rows="3" class="form-input w-full"
+                                  placeholder="Nội dung chi tiết cảnh báo..."></textarea>
+                        <button onclick="createAlert(${plantId})"
+                                class="btn-primary w-full">
+                            + Tạo cảnh báo
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            openDrawer("Cảnh báo", html);
+        }
+
+        async function createAlert(plantId) {
+            const typeEl = $("alertTypeInput");
+            const msgEl = $("alertMsgInput");
+            const type = typeEl?.value.trim();
+            const msg = msgEl?.value.trim();
+
+            if (!type || !msg) {
+                alert("Vui lòng nhập đầy đủ loại cảnh báo và nội dung.");
+                return;
+            }
+
+            const body = {
+                plantId: plantId,
+                alertType: type,
+                message: msg
+            };
+
+            const { ok, raw } = await fetchJson(`${API_BASE}/alerts`, {
+                method: "POST",
+                body: JSON.stringify(body)
+            });
+
+            if (!ok) {
+                alert(raw?.message || "Không thể tạo cảnh báo.");
+                return;
+            }
+
+            alert("✅ Tạo cảnh báo thành công");
+            openAlerts(plantId);   // reload drawer
+            loadWaterCalendar();   // để calendar cũng update chấm đỏ
+        }
+
+        async function resolveAlert(alertId, plantId) {
+            const { ok, raw } = await fetchJson(`${API_BASE}/alerts/${alertId}/resolve`, {
+                method: "POST"
+            });
+            if (!ok) {
+                alert(raw?.message || "Không thể xử lý cảnh báo.");
+                return;
+            }
+            alert("✅ Đã xử lý cảnh báo");
+            openAlerts(plantId);
+            loadWaterCalendar(); // cập nhật lại lịch (có thể bớt cảnh báo)
+        }
+
+        // ================== MAPS ==================
+        const healthDescriptions = {
+            "Good": "Tốt 🌿",
+            "Average": "Trung bình 🌾",
+            "Poor": "Kém 🍂",
+            "Wilted": "Héo 🥀",
+            "Yellow": "Vàng lá 💛"
+        };
+
+        const statusDescriptions = {
+            "Growing": "Đang phát triển 🌱",
+            "Harvested": "Đã thu hoạch 🧺",
+            "Dead": "Đã chết ⚰️"
+        };
+
+        // ================== DRAWER ==================
+        function openDrawer(title, html) {
+            $("drawerTitle").textContent = title;
+            $("drawerBody").innerHTML = html;
+            $("drawer").classList.remove("hidden");
+        }
+        function closeDrawer() {
+            $("drawer").classList.add("hidden");
+            $("drawerBody").innerHTML = "";
+        }
+
+        // ================== PLANT LIST ==================
+        function buildQuery(page) {
+            const qs = new URLSearchParams();
+            qs.set("page", page);
+            qs.set("size", PAGE_SIZE);
+            const search = $("searchBox").value.trim();
+            const sort = $("sortSelect").value;
+            if (search) qs.set("search", search);
+            if (sort) qs.set("sort", sort);
+            return qs.toString();
+        }
+
+        async function loadPlants(page = 1) {
+            const tbody = $("plantRows");
+            tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-4 text-center text-gray-500">Đang tải...</td></tr>`;
+
+            const { ok, data, status } = await fetchJson(`${API_BASE}/plants?${buildQuery(page)}`);
+
+            if (status === 401) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-4 text-center text-red-600">⚠️ Bạn chưa đăng nhập.</td></tr>`;
+                return;
+            }
+
+            const items = data.items ?? data.data?.items ?? data ?? [];
+            totalItems = data.total ?? data.data?.total ?? items.length ?? 0;
+            const sizeNum = data.size ?? PAGE_SIZE;
+            const maxPage = Math.max(1, Math.ceil(totalItems / sizeNum));
+
+            if (!Array.isArray(items) || items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="px-4 py-4 text-center text-gray-500">Không có cây nào.</td></tr>`;
+                $("plantTotal").textContent = "0 cây";
+                $("pageInfo").textContent = "—";
+                return;
+            }
+
+            let indexStart = (page - 1) * sizeNum + 1;
+            tbody.innerHTML = items.map((p, i) => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2">${indexStart + i}</td>
+                    <td class="px-4 py-2 font-medium">${p.name ?? "—"}</td>
+                    <td class="px-4 py-2">${p.species ?? "—"}</td>
+                    <td class="px-4 py-2">${healthDescriptions[p.health] ?? "—"}</td>
+                    <td class="px-4 py-2">${statusDescriptions[p.status] ?? "—"}</td>
+                    <td class="px-4 py-2">${fmtDate(p.plantedDate)}</td>
+                    <td class="px-4 py-2">
+                        <div class="flex flex-wrap gap-1 justify-center">
+                            <a href="/App/Edit/${p.plantId}"
+                               class="px-2 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">Sửa</a>
+                            <button onclick="openSchedules(${p.plantId})"
+                                    class="px-2 py-1 text-emerald-700 border border-emerald-200 rounded-lg hover:bg-emerald-50">
+                                Lịch
+                            </button>
+                            <button onclick="openAlerts(${p.plantId})"
+                                    class="px-2 py-1 text-amber-700 border border-amber-200 rounded-lg hover:bg-amber-50">
+                                Cảnh báo
+                            </button>
+                            <button onclick="openPlantReport(${p.plantId})"
+                                    class="px-2 py-1 text-purple-700 border border-purple-200 rounded-lg hover:bg-purple-50">
+                                Báo cáo
+                            </button>
+                            <button onclick="openUsage(${p.plantId})"
+                                    class="px-2 py-1 text-sky-700 border border-sky-200 rounded-lg hover:bg-sky-50">
+                                Tài nguyên
+                            </button>
+                            <button onclick="deletePlant(${p.plantId})"
+                                    class="px-2 py-1 text-red-600 border border-red-200 rounded-lg hover:bg-red-50">
+                                Xóa
+                            </button>
+                        </div>
+                    </td>
+                </tr>`).join("");
+
+            curPage = page;
+            $("pageInfo").textContent = `Trang ${page} / ${maxPage}`;
+            $("plantTotal").textContent = `${totalItems} cây`;
+            $("prevPage").disabled = page <= 1;
+            $("nextPage").disabled = page >= maxPage;
+        }
+
+        // ================== DELETE PLANT ==================
+        async function deletePlant(id) {
+            if (!confirm("Xóa cây này?")) return;
+            const { ok } = await fetchJson(`${API_BASE}/plants/${id}`, { method: "DELETE" });
+            if (ok) {
+                await loadPlants(curPage);
+                await loadWaterCalendar();
+            } else {
+                alert("❌ Không thể xóa cây.");
+            }
+        }
+
+        // ================== SCHEDULES (LỊCH CHĂM SÓC) ==================
+        async function openSchedules(plantId) {
+            const { ok, data } = await fetchJson(`${API_BASE}/schedules?plantId=${plantId}`);
+            const list = Array.isArray(data) ? data : [];
+
+            let html = `
+                <div class="flex items-center justify-between mb-2">
+                    <div class="font-semibold text-base">📅 Lịch chăm sóc cây #${plantId}</div>
+                </div>
+                <div class="mb-3 text-xs text-gray-500">
+                    Xem các lịch đang có và tạo lịch mới cho cây này.
+                </div>
+            `;
+
+            if (list.length === 0) {
+                html += `<div class="text-gray-500 text-sm mb-3">Chưa có lịch nào cho cây này.</div>`;
+            } else {
+                html += `
+                    <div class="mb-3">
+                        <div class="text-xs font-semibold text-gray-500 mb-1">Lịch hiện tại</div>
+                        <div class="space-y-2">
+                            ${list.map(s => `
+                                <div class="border border-gray-200 rounded-lg p-2 flex justify-between items-center">
+                                    <div>
+                                        <div class="font-medium">${s.taskType} (${s.frequency})</div>
+                                        <div class="text-xs text-gray-500">
+                                            Tiếp theo: ${fmtDate(s.nextDue)}<br/>
+                                            Trạng thái: ${s.status}
+                                        </div>
+                                    </div>
+                                    <button onclick="markScheduleDone(${s.scheduleId})"
+                                            class="text-xs px-2 py-1 rounded-lg border border-emerald-200 text-emerald-700 hover:bg-emerald-50">
+                                        Đã làm
+                                    </button>
+                                </div>
+                            `).join("")}
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Form tạo lịch mới (ĐÃ THÊM SỐ LẦN LẶP)
+            html += `
+                <div class="border-t border-gray-200 pt-3 mt-3">
+                    <div class="text-xs font-semibold text-gray-500 mb-2">Tạo lịch chăm sóc mới</div>
+                    <div class="space-y-2">
+                        <input id="fTaskType" type="text" class="form-input w-full" placeholder="Ví dụ: Tưới nước" />
+                        <select id="fFrequency" class="form-select w-full">
+                            <option value="daily">Hàng ngày</option>
+                            <option value="weekly">Hàng tuần</option>
+                            <option value="monthly">Hàng tháng</option>
+                            <option value="every3days">Mỗi 3 ngày</option>
+                        </select>
+                        <input id="fNextDue" type="datetime-local" class="form-input w-full" />
+
+                        <!-- Số lần lặp -->
+                        <input id="fCount" type="number" min="1" value="1"
+                               class="form-input w-full"
+                               placeholder="Số lần lặp (ví dụ 5)" />
+
+                        <button onclick="createSchedule(${plantId})"
+                                class="btn-primary w-full mt-1">
+                            + Tạo lịch
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            openDrawer("Lịch chăm sóc", html);
+        }
+
+                     async function createSchedule(plantId) {
+            const taskType = $("fTaskType").value.trim();
+            const frequency = $("fFrequency").value;
+            const nextDueStr = $("fNextDue").value;
+            const countStr = $("fCount")?.value || "1";
+            const count = parseInt(countStr, 10) || 1;
+
+            if (!taskType || !nextDueStr) {
+                alert("Vui lòng nhập đầy đủ thông tin lịch.");
+                return;
+            }
+
+            let dt = new Date(nextDueStr);  
+            dt.setDate(dt.getDate() - 1);   
+            const adjustedNextDue = toInputDateTimeString(dt);
+
+            const body = {
+                plantId: plantId,
+                taskType: taskType,
+                frequency: frequency,
+                nextDue: adjustedNextDue,  
+                count: count
+            };
+
+            const { ok, raw } = await fetchJson(`${API_BASE}/schedules`, {
+                method: "POST",
+                body: JSON.stringify(body)
+            });
+
+            if (!ok) {
+                alert(raw?.message || "Không thể tạo lịch.");
+                return;
+            }
+
+            alert("✅ Tạo lịch thành công");
+            openSchedules(plantId);
+            loadWaterCalendar();
+        }
+
+                function toInputDateTimeString(d) {
+            const pad = n => String(n).padStart(2, "0");
+            return d.getFullYear() + "-" +
+                pad(d.getMonth() + 1) + "-" +
+                pad(d.getDate()) + "T" +
+                pad(d.getHours()) + ":" +
+                pad(d.getMinutes());
+        }
+
+        async function markScheduleDone(scheduleId) {
+            const doneAt = new Date().toISOString();
+            const body = { doneAt: doneAt };
+
+            const { ok, raw } = await fetchJson(`${API_BASE}/schedules/${scheduleId}/done`, {
+                method: "POST",
+                body: JSON.stringify(body)
+            });
+
+            if (!ok) {
+                alert(raw?.message || "Không thể đánh dấu hoàn thành.");
+                return;
+            }
+
+            alert("✅ Đã đánh dấu hoàn thành & tạo lịch kế tiếp");
+            const title = $("drawerTitle").textContent || "";
+            const pid = parseInt(title.replace(/\D+/g, "")) || 0;
+            if (pid > 0) openSchedules(pid);
+
+            loadWaterCalendar(); 
+        }
+
+        // ================== REPORT (BÁO CÁO CÂY) ==================
+        async function openPlantReport(plantId) {
+            const { ok, data } = await fetchJson(`${API_BASE}/reports/plant/${plantId}`);
+            if (!ok || !data) {
+                openDrawer("Báo cáo cây", `<div class="text-sm text-red-600">Không lấy được dữ liệu báo cáo.</div>`);
+                return;
+            }
+
+            const html = `
+                <div class="font-semibold text-base mb-2">📊 Báo cáo cây "${data.plantName}" (#${data.plantId})</div>
+                <div class="space-y-2 text-sm">
+                    <div class="flex justify-between">
+                        <span>Nhật ký chăm sóc:</span>
+                        <span class="font-semibold">${data.totalLogs}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Số cảnh báo:</span>
+                        <span class="font-semibold">${data.totalAlerts}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Số lịch chăm sóc:</span>
+                        <span class="font-semibold">${data.totalSchedules}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span>Tổng chi phí:</span>
+                        <span class="font-semibold">${(data.totalCost ?? 0).toLocaleString("vi-VN")} đ</span>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs text-gray-500">
+                    * Các số liệu dựa trên lịch sử sử dụng tài nguyên và hoạt động của cây.
+                </div>
+            `;
+            openDrawer("Báo cáo cây", html);
+        }
+
+        // ================== USAGE (SỬ DỤNG TÀI NGUYÊN) ==================
+        async function openUsage(plantId) {
+            const { ok, data } = await fetchJson(`${API_BASE}/usage?plantId=${plantId}`);
+            const list = Array.isArray(data) ? data : [];
+
+            let html = `
+                <div class="font-semibold text-base mb-2">🧪 Tài nguyên dùng cho cây #${plantId}</div>
+            `;
+
+            if (list.length === 0) {
+                html += `<div class="text-gray-500 text-sm">Chưa có lịch sử sử dụng tài nguyên cho cây này.</div>`;
+            } else {
+                html += `
+                    <div class="space-y-2 text-sm">
+                        ${list.map(u => `
+                            <div class="border border-gray-200 rounded-lg p-2">
+                                <div class="flex justify-between">
+                                    <span class="font-medium">${u.resourceName}</span>
+                                    <span class="text-xs text-gray-500">${fmtDate(u.usedAt)}</span>
+                                </div>
+                                <div class="text-xs text-gray-600">
+                                    Số lượng: <b>${u.quantityUsed}</b>
+                                    ${u.note ? `- Ghi chú: ${u.note}` : ""}
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                `;
+            }
+
+            html += `
+                <div class="mt-4 text-xs text-gray-400">
+                    * Việc thêm mới sử dụng tài nguyên hiện đang thực hiện ở màn quản lý tài nguyên (Resources).
+                </div>
+            `;
+
+            openDrawer("Tài nguyên", html);
+        }
+
+        // ================== EVENTS ==================
+        $("btnSearch")?.addEventListener("click", () => loadPlants(1));
+        $("prevPage")?.addEventListener("click", () => curPage > 1 && loadPlants(curPage - 1));
+        $("nextPage")?.addEventListener("click", () => loadPlants(curPage + 1));
+
+        // ================== INIT ==================
+                document.addEventListener("DOMContentLoaded", () => {
+            loadPlants(1);
+            loadWaterCalendar();
+
+            // 👇 mỗi 30s gọi API check-reminders 1 lần
+            setInterval(() => {
+                fetchJson(`${API_BASE}/schedules/check-reminders`, {
+                    method: "POST"
+                });
+            }, 30000);
+        });
+
+    </script>
+}
+
+<style>
+    .form-input, .form-select {
+        border: 1px solid #d1d5db;
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background-color: white;
+    }
+
+    .btn-primary {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        background-color: #10b981;
+        color: white;
+        font-size: 0.875rem;
+    }
+
+        .btn-primary:hover {
+            background-color: #059669;
+        }
+
+    .btn-secondary {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid #d1d5db;
+        font-size: 0.875rem;
+        background-color: white;
+    }
+
+        .btn-secondary:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+</style>
+//aa

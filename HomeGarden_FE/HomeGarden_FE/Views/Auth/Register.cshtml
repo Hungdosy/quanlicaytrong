@@ -1,0 +1,77 @@
+﻿@{
+    Layout = null;
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8" />
+    <title>HomeGarden — Đăng ký</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <meta name="color-scheme" content="light dark" />
+</head>
+<body class="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center p-4">
+    <div class="w-full max-w-md">
+        <div class="bg-white dark:bg-gray-800 shadow-xl rounded-2xl p-6 md:p-8">
+            <div class="flex items-center gap-3 mb-6">
+                <div class="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-emerald-600" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2a1 1 0 0 1 .894.553l1.9 3.8 4.193.61a1 1 0 0 1 .554 1.705l-3.036 2.96.716 4.173a1 1 0 0 1-1.452 1.054L12 15.9l-3.77 1.985a1 1 0 0 1-1.452-1.054l.715-4.173L4.457 8.668a1 1 0 0 1 .553-1.705l4.194-.61 1.9-3.8A1 1 0 0 1 12 2Z" />
+                    </svg>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-gray-900 dark:text-white">Tạo tài khoản</h1>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Đăng ký để quản lý vườn nhà</p>
+                </div>
+            </div>
+
+            <form id="registerForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Họ và tên</label>
+                    <input id="fullname" type="text" class="mt-1 block w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Email</label>
+                    <input id="email" type="email" class="mt-1 block w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Số điện thoại</label>
+                    <input id="phone" type="tel" class="mt-1 block w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Mật khẩu</label>
+                        <button type="button" id="togglePwd" class="text-xs text-emerald-600 hover:underline">Hiện</button>
+                    </div>
+                    <input id="password" type="password" class="mt-1 block w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+
+                <div>
+                    <div class="flex items-center justify-between">
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-200">Nhập lại mật khẩu</label>
+                        <button type="button" id="togglePwd2" class="text-xs text-emerald-600 hover:underline">Hiện</button>
+                    </div>
+                    <input id="confirmPassword" type="password" class="mt-1 block w-full rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent" />
+                </div>
+
+                <button id="btnRegister" type="button" class="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 text-white font-medium px-4 py-2.5 hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 disabled:opacity-60">
+                    <span>Tạo tài khoản</span>
+                </button>
+
+                <p id="msg" class="text-sm text-red-600 whitespace-pre-line hidden"></p>
+                <p id="ok" class="text-sm text-green-600 whitespace-pre-line hidden"></p>
+
+                <p class="text-center text-sm text-gray-600 dark:text-gray-400 mt-2">
+                    Đã có tài khoản? <a href="@Url.Content("~/Auth/Login")" class="text-emerald-600 hover:underline">Đăng nhập</a>
+                </p>
+            </form>
+        </div>
+    </div>
+
+    <script src="~/js/register.js"></script>
+</body>
+</html>

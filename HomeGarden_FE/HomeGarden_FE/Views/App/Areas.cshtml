@@ -1,0 +1,194 @@
+﻿@{
+    Layout = "_Layout";
+    ViewData["Title"] = "Khu vực trồng";
+}
+
+<div class="mx-auto max-w-5xl px-4 py-8">
+    <div class="flex items-center justify-between mb-6">
+        <h1 class="text-2xl font-bold">🏡 Khu vực trồng cây</h1>
+        <button id="btnAdd" class="btn-primary">+ Thêm khu vực</button>
+    </div>
+
+    <div class="rounded-2xl border border-gray-200 overflow-hidden">
+        <table class="min-w-full text-sm divide-y divide-gray-200">
+            <thead class="bg-gray-50 text-xs font-semibold text-gray-600">
+                <tr>
+                    <th class="px-4 py-2 text-left w-10">#</th>
+                    <th class="px-4 py-2 text-left">Tên khu vực</th>
+                    <th class="px-4 py-2 text-left">Vị trí</th>
+                    <th class="px-4 py-2 text-left">Trạng thái</th>
+                    <th class="px-4 py-2 text-center w-40">Thao tác</th>
+                </tr>
+            </thead>
+            <tbody id="areaRows" class="divide-y divide-gray-200"></tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Modal thêm/sửa -->
+<div id="areaModal" class="fixed inset-0 bg-black/50 hidden items-center justify-center z-50">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md">
+        <h2 id="modalTitle" class="text-xl font-semibold mb-4"></h2>
+        <div class="space-y-3">
+            <input id="areaName" class="form-input w-full" placeholder="Tên khu vực" />
+            <input id="areaLocation" class="form-input w-full" placeholder="Vị trí" />
+            <textarea id="areaDesc" rows="3" class="form-input w-full" placeholder="Mô tả"></textarea>
+            <select id="areaStatus" class="form-select w-full">
+                <option value="4">Hoạt động 🌿</option>
+                <option value="5">Ngừng sử dụng 💤</option>
+            </select>
+        </div>
+        <div class="flex justify-end gap-2 mt-4">
+            <button id="btnCancel" class="btn-secondary">Hủy</button>
+            <button id="btnSave" class="btn-primary">Lưu</button>
+        </div>
+        <p id="msg" class="mt-2 text-sm"></p>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        const API_BASE = "https://localhost:7120/api";
+        const $ = id => document.getElementById(id);
+
+        function getToken() {
+            return localStorage.getItem("hg_token") || sessionStorage.getItem("hg_token");
+        }
+        function headers() {
+            const t = getToken();
+            return {
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                ...(t ? { Authorization: "Bearer " + t } : {})
+            };
+        }
+
+        async function fetchJson(url, opt = {}) {
+            try {
+                const res = await fetch(url, { ...opt, headers: headers() });
+                const body = await res.json().catch(() => ({}));
+                return { ok: res.ok, data: body.data ?? body, message: body.message ?? "" };
+            } catch {
+                return { ok: false, message: "Lỗi kết nối." };
+            }
+        }
+
+        async function loadAreas() {
+            const tbody = $("areaRows");
+            tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-gray-500">Đang tải...</td></tr>`;
+            const { ok, data } = await fetchJson(`${API_BASE}/areas`);
+            if (!ok) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-red-500">Không tải được dữ liệu.</td></tr>`;
+                return;
+            }
+            if (!data.length) {
+                tbody.innerHTML = `<tr><td colspan="5" class="px-4 py-4 text-center text-gray-400">Chưa có khu vực nào.</td></tr>`;
+                return;
+            }
+            tbody.innerHTML = data.map((a, i) => `
+                <tr class="hover:bg-gray-50">
+                    <td class="px-4 py-2">${i + 1}</td>
+                    <td class="px-4 py-2 font-medium">${a.name}</td>
+                    <td class="px-4 py-2">${a.location ?? "—"}</td>
+                    <td class="px-4 py-2">${a.status === "Active" ? "Hoạt động 🌿" : "Ngừng sử dụng 💤"}</td>
+                    <td class="px-4 py-2 text-center flex justify-center gap-2">
+                        <button onclick="editArea(${a.areaId}, '${a.name}', '${a.location ?? ""}', '${a.description ?? ""}', '${a.status}')"
+                            class="px-2 py-1 text-blue-600 border border-blue-200 rounded-lg hover:bg-blue-50">Sửa</button>
+                        <button onclick="deleteArea(${a.areaId})"
+                            class="px-2 py-1 text-red-600 border border-red-200 rounded-lg hover:bg-red-50">Xóa</button>
+                    </td>
+                </tr>
+            `).join("");
+        }
+
+        let editingId = null;
+        function openModal(isEdit = false) {
+            $("areaModal").classList.remove("hidden");
+            $("modalTitle").textContent = isEdit ? "Chỉnh sửa khu vực" : "Thêm khu vực";
+        }
+        $("btnCancel").onclick = () => $("areaModal").classList.add("hidden");
+
+        $("btnAdd").onclick = () => {
+            editingId = null;
+            $("areaName").value = "";
+            $("areaLocation").value = "";
+            $("areaDesc").value = "";
+            $("areaStatus").value = 4;
+            openModal(false);
+        };
+
+        function editArea(id, name, loc, desc, status) {
+            editingId = id;
+            $("areaName").value = name;
+            $("areaLocation").value = loc;
+            $("areaDesc").value = desc;
+            $("areaStatus").value = status === "Active" ? 4 : 5;
+            openModal(true);
+        }
+
+        $("btnSave").onclick = async () => {
+            const body = {
+                name: $("areaName").value.trim(),
+                location: $("areaLocation").value.trim(),
+                description: $("areaDesc").value.trim(),
+                statusId: parseInt($("areaStatus").value)
+            };
+            if (!body.name) {
+                $("msg").textContent = "⚠️ Tên khu vực không được để trống.";
+                $("msg").className = "text-sm text-red-600";
+                return;
+            }
+
+            let result;
+                    if (editingId)
+            result = await fetchJson(`${API_BASE}/areas/${editingId}`, { method: "PUT", body: JSON.stringify(body) });
+        else
+            result = await fetchJson(`${API_BASE}/areas`, { method: "POST", body: JSON.stringify(body) });
+
+
+            $("msg").textContent = result.ok ? "✅ Lưu thành công!" : "❌ " + result.message;
+            $("msg").className = result.ok ? "text-sm text-green-600" : "text-sm text-red-600";
+            if (result.ok) {
+                setTimeout(() => {
+                    $("areaModal").classList.add("hidden");
+                    loadAreas();
+                }, 700);
+            }
+        };
+
+        async function deleteArea(id) {
+            if (!confirm("Bạn có chắc muốn xóa khu vực này?")) return;
+            const { ok } = await fetchJson(`${API_BASE}/areas/${id}`, { method: "DELETE" });
+            if (ok) loadAreas(); else alert("Không thể xóa khu vực.");
+        }
+
+        document.addEventListener("DOMContentLoaded", loadAreas);
+    </script>
+}
+
+<style>
+    .form-input, .form-select {
+        border: 1px solid #d1d5db;
+        border-radius: 0.75rem;
+        padding: 0.5rem 0.75rem;
+        background-color: white;
+    }
+
+    .btn-primary {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        background-color: #10b981;
+        color: white;
+    }
+
+        .btn-primary:hover {
+            background-color: #059669;
+        }
+
+    .btn-secondary {
+        padding: 0.5rem 1rem;
+        border-radius: 0.75rem;
+        border: 1px solid #d1d5db;
+    }
+</style>
+//aa

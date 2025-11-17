@@ -1,6 +1,7 @@
 ﻿using HomeGarden.Dtos;
 using HomeGarden.Dtos.Common;
 using HomeGarden.Models;
+using HomeGarden.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
@@ -12,7 +13,12 @@ namespace HomeGarden.Controllers
     public class SchedulesController : BaseApiController
     {
         private readonly HomeGardenDbContext _db;
-        public SchedulesController(HomeGardenDbContext db) => _db = db;
+        private readonly EmailService _emailService;
+        public SchedulesController(HomeGardenDbContext db, EmailService emailService)
+        {
+            _db = db;
+            _emailService = emailService;
+        }
 
         [HttpGet]
         public async Task<ActionResult<ApiResponse<List<ScheduleListDto>>>> List([FromQuery] long? plantId)
@@ -45,13 +51,11 @@ namespace HomeGarden.Controllers
             return ApiResponse.Success(list);
         }
 
-        
+
         [HttpPost]
         [Authorize(Roles = "User,Technician,Admin")]
         public async Task<ActionResult<ApiResponse<object>>> Create([FromBody] ScheduleCreateDto dto)
         {
-            if (dto.NextDue < DateTime.Now)
-                return ApiResponse.Fail<object>("Thời gian NextDue phải lớn hơn hiện tại");
 
             var plant = await _db.Plants
                 .Include(p => p.Area)
@@ -68,25 +72,48 @@ namespace HomeGarden.Controllers
                 .Select(s => s.StatusId)
                 .FirstOrDefaultAsync();
 
-            var schedule = new Schedule
-            {
-                PlantId = dto.PlantId,
-                TaskType = dto.TaskType.Trim(),
-                Frequency = dto.Frequency.Trim(),
-                NextDue = dto.NextDue,
-                StatusId = pendingId,
-                Reminder = true,
-                CreatedAt = DateTime.Now,
-                IsDeleted = false
-            };
+            if (pendingId == 0)
+                return ApiResponse.Fail<object>("Không tìm thấy trạng thái Pending cho Schedule");
 
-            _db.Schedules.Add(schedule);
+            var count = dto.Count <= 0 ? 1 : dto.Count;
+            if (count > 100)
+                count = 100; 
+
+            var schedules = new List<Schedule>();
+            var next = dto.NextDue;
+
+            for (int i = 0; i < count; i++)
+            {
+                schedules.Add(new Schedule
+                {
+                    PlantId = dto.PlantId,
+                    TaskType = dto.TaskType.Trim(),
+                    Frequency = dto.Frequency.Trim(),
+                    NextDue = next,
+                    StatusId = pendingId,
+                    Reminder = true,
+                    CreatedAt = DateTime.Now,
+                    IsDeleted = false
+                });
+
+                next = ComputeNextDue(next, dto.Frequency);
+            }
+
+            _db.Schedules.AddRange(schedules);
             await _db.SaveChangesAsync();
 
-            return ApiResponse.Success((object)new { schedule.ScheduleId }, "Tạo lịch thành công");
+            return ApiResponse.Success(
+                (object)new
+                {
+                    firstScheduleId = schedules.First().ScheduleId,
+                    totalCreated = schedules.Count
+                },
+                $"Tạo {schedules.Count} lịch thành công"
+            );
         }
 
-       
+
+
         [HttpPost("{id:long}/done")]
         public async Task<ActionResult<ApiResponse<string>>> MarkDone(long id, [FromBody] ScheduleDoneDto dto)
         {
@@ -135,8 +162,117 @@ namespace HomeGarden.Controllers
 
             return ApiResponse.Success("Đã đánh dấu hoàn thành và tạo lịch kế tiếp");
         }
+        [HttpPost("check-reminders")]
+        public async Task<ActionResult<ApiResponse<int>>> CheckReminders()
+        {
+            // user hiện tại (từ BaseApiController)
+            var uid = CurrentUserId;
+            if (uid == null)
+                return ApiResponse.Fail<int>("Không xác định được user hiện tại", 401);
 
-     
+            var now = DateTime.Now;
+            var upper = now.AddMinutes(1); // trong vòng 1 phút tới
+
+            // chỉ lấy lịch của user hiện tại
+            var schedules = await _db.Schedules
+                .Include(s => s.Plant)
+                    .ThenInclude(p => p.Area)
+                .Where(s =>
+                    (s.IsDeleted == false || s.IsDeleted == null) &&
+                    s.Reminder == true &&
+                    s.NextDue > now &&
+                    s.NextDue <= upper &&
+                    s.Plant.Area.UserId == uid       // 👈 chỉ lịch của user đang đăng nhập
+                )
+                .ToListAsync();
+
+            if (!schedules.Any())
+                return ApiResponse.Success(0, "Không có lịch nào cần nhắc.");
+
+            // tất cả những user liên quan thực ra chỉ là 1 uid, nhưng viết chung cũng được
+            var userIds = schedules
+                .Select(s => s.Plant.Area.UserId)
+                .Distinct()
+                .ToList();
+
+            var users = await _db.Users
+                .Where(u => userIds.Contains(u.UserId))
+                .ToDictionaryAsync(u => u.UserId);
+
+            var recentSince = now.AddMinutes(-2);
+            var recentNoti = await _db.EmailNotifications
+                .Where(n => n.SendTime >= recentSince && userIds.Contains(n.UserId))
+                .Select(n => new { n.UserId, n.Subject, n.SendTime })
+                .ToListAsync();
+
+            var sentKeys = new HashSet<string>(
+                recentNoti.Select(n => $"{n.UserId}::{n.Subject}")
+            );
+
+            int sentCount = 0;
+
+            foreach (var s in schedules)
+            {
+                if (!users.TryGetValue(s.Plant.Area.UserId, out var user))
+                    continue;
+
+                if (string.IsNullOrWhiteSpace(user.Email))
+                    continue;
+
+                var subject = $"[HomeGarden] Nhắc lịch: {s.TaskType} cho cây {s.Plant.Name}";
+                var key = $"{user.UserId}::{subject}";
+
+                // tránh spam: 2 phút vừa rồi đã gửi cùng subject cho user này rồi thì bỏ
+                if (sentKeys.Contains(key))
+                    continue;
+
+                var content = $@"
+Xin chào {user.Fullname},
+
+Trong khoảng 1 phút nữa (lúc {s.NextDue:HH:mm dd/MM/yyyy})
+bạn có lịch ""{s.TaskType}"" cho cây ""{s.Plant.Name}"" ở khu vực ""{s.Plant.Area.Name}"". 
+
+Vui lòng thực hiện đúng lịch để cây phát triển tốt hơn 🌿
+
+— Hệ thống HomeGarden
+";
+
+                try
+                {
+                    await _emailService.SendAsync(user.Email, subject, content);
+
+                    _db.EmailNotifications.Add(new EmailNotification
+                    {
+                        UserId = user.UserId,
+                        Subject = subject,
+                        Content = content,
+                        Sent = true,
+                        SendTime = now,
+                        SentAt = now
+                    });
+
+                    sentKeys.Add(key);
+                    sentCount++;
+                }
+                catch
+                {
+                    _db.EmailNotifications.Add(new EmailNotification
+                    {
+                        UserId = user.UserId,
+                        Subject = subject,
+                        Content = content,
+                        Sent = false,
+                        SendTime = now
+                    });
+                }
+            }
+
+            if (sentCount > 0)
+                await _db.SaveChangesAsync();
+
+            return ApiResponse.Success(sentCount, $"Đã gửi {sentCount} email nhắc lịch.");
+        }
+
         private DateTime ComputeNextDue(DateTime from, string frequency)
         {
             frequency = frequency?.ToLower() ?? "daily";
@@ -145,7 +281,6 @@ namespace HomeGarden.Controllers
             if (frequency == "weekly") return from.AddDays(7);
             if (frequency == "monthly") return from.AddMonths(1);
 
-            // hỗ trợ custom như "every3days"
             if (frequency.StartsWith("every"))
             {
                 var num = new string(frequency.Where(char.IsDigit).ToArray());

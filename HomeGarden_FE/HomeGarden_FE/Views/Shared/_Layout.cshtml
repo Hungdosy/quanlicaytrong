@@ -1,49 +1,231 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+﻿@{
+    var title = ViewData["Title"] as string ?? "HomeGarden";
+}
+<!DOCTYPE html>
+<html lang="vi" class="h-full" data-theme="light">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - HomeGarden_FE</title>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/HomeGarden_FE.styles.css" asp-append-version="true" />
+    <title>@title – HomeGarden</title>
+
+    <!-- Tailwind CSS via CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                brand: { DEFAULT: '#059669', 50:'#ecfdf5',100:'#d1fae5',200:'#a7f3d0',300:'#6ee7b7',400:'#34d399',500:'#10b981',600:'#059669',700:'#047857',800:'#065f46',900:'#064e3b' }
+              }
+            }
+          },
+          darkMode: 'class'
+        }
+    </script>
+
+    <meta name="color-scheme" content="light dark" />
+    <style>
+        /* tránh FOUC khi toggle theme sớm */
+        html {
+            visibility: hidden;
+        }
+    </style>
+    <script>
+        // Dark mode: lưu lựa chọn user
+        (function () {
+          const saved = localStorage.getItem('hg_theme');
+          const preferDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          const isDark = saved ? saved === 'dark' : preferDark;
+          document.documentElement.classList.toggle('dark', isDark);
+          document.documentElement.dataset.theme = isDark ? 'dark' : 'light';
+          document.documentElement.style.visibility = 'visible';
+        })();
+    </script>
 </head>
-<body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">HomeGarden_FE</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
+<body class="min-h-screen bg-white text-gray-800 dark:bg-gray-900 dark:text-gray-100">
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur border-b border-gray-200 dark:border-gray-800">
+        <nav class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            <div class="flex h-16 items-center justify-between">
+                <!-- Brand -->
+                <a asp-controller="Home" asp-action="Index" class="inline-flex items-center gap-2">
+                    <span class="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-brand/10">
+                        <svg class="h-5 w-5 text-brand" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                            <path d="M12 2a1 1 0 0 1 .9.55l1.9 3.8 4.2.61a1 1 0 0 1 .55 1.7l-3.04 2.96.72 4.18a1 1 0 0 1-1.45 1.06L12 15.9l-3.77 1.98a1 1 0 0 1-1.45-1.06l.72-4.18L4.46 8.68a1 1 0 0 1 .55-1.7l4.19-.6 1.9-3.83A1 1 0 0 1 12 2Z" />
+                        </svg>
+                    </span>
+                    <span class="text-lg font-bold">HomeGarden</span>
+                </a>
+
+                <!-- Desktop menu -->
+                <!-- Desktop menu -->
+                <div class="hidden md:flex items-center gap-6">
+                    <a asp-controller="Home" asp-action="Index" class="hover:text-brand">Trang chủ</a>
+                    <a href="#features" class="hover:text-brand">Tính năng</a>
+                    <a href="#how" class="hover:text-brand">Cách hoạt động</a>
+                    <a href="#cta" class="hover:text-brand">Bắt đầu</a>
+
+                    <!-- Chỉ hiện khi đăng nhập -->
+                    <a id="lnkCareDesktop" asp-controller="App" asp-action="Index"
+                       class="hidden hover:text-brand">Quản lý cây</a>
+                    <a id="lnkAreasDesktop" asp-controller="App" asp-action="Areas"
+                       class="hidden hover:text-brand">Quản lý khu vực</a>
+                </div>
+
+                <!-- Actions (desktop) -->
+                <div class="hidden md:flex items-center gap-3">
+                    <button id="themeToggle" class="rounded-lg border border-gray-200 dark:border-gray-700 p-2 hover:bg-gray-50 dark:hover:bg-gray-800" title="Đổi giao diện">
+                        <svg id="iconSun" class="h-5 w-5 hidden dark:inline" viewBox="0 0 24 24" fill="currentColor"><path d="M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12ZM12 2a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0V3a1 1 0 0 1 1-1Zm0 18a1 1 0 0 1 1 1v1a1 1 0 1 1-2 0v-1a1 1 0 0 1 1-1Z" /></svg>
+                        <svg id="iconMoon" class="h-5 w-5 dark:hidden" viewBox="0 0 24 24" fill="currentColor"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" /></svg>
+                    </button>
+
+                    <!-- Guest actions -->
+                    <div id="guestActions" class="flex items-center gap-3">
+                        <a class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
+                           asp-controller="Auth" asp-action="Login">Đăng nhập</a>
+                        <a class="px-4 py-2 rounded-xl bg-brand text-white hover:bg-emerald-600"
+                           asp-controller="Auth" asp-action="Register">Đăng ký</a>
+                    </div>
+
+                    <!-- User actions -->
+                    <div id="userActions" class="hidden items-center gap-3">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">
+                            Xin chào, <strong id="userName" class="font-semibold">User</strong>
+                        </span>
+                        <button id="btnLogout" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800">
+                            Đăng xuất
+                        </button>
+                    </div>
+                </div>
+
+
+                <!-- Mobile burger -->
+                <button id="btnOpen" class="md:hidden rounded-lg p-2 hover:bg-gray-100 dark:hover:bg-gray-800" aria-label="Menu">
+                    <svg class="h-6 w-6" viewBox="0 0 24 24" fill="currentColor"><path d="M3 6h18M3 12h18M3 18h18" /></svg>
                 </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
+            </div>
+            <!-- Mobile menu -->
+            <div id="mobileMenu" class="md:hidden hidden pb-3">
+                <div class="flex flex-col gap-2 pt-2 border-t border-gray-200 dark:border-gray-800">
+                    <a asp-controller="Home" asp-action="Index" class="px-2 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800">Trang chủ</a>
+                    <a href="#features" class="px-2 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800">Tính năng</a>
+                    <a href="#how" class="px-2 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800">Cách hoạt động</a>
+                    <a href="#cta" class="px-2 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800">Bắt đầu</a>
+
+                    <!-- Chỉ hiện khi đăng nhập -->
+                    <a id="lnkCareMobile" asp-controller="App" asp-action="Index"
+                       class="hidden px-2 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800">Quản lý cây trồng</a>
+                    <a id="lnkAreasMobile" asp-controller="App" asp-action="Areas"
+                       class="hidden px-2 py-2 rounded hover:bg-gray-50 dark:hover:bg-gray-800">Quản lý khu vực</a>
+
+                    <!-- Guest actions (mobile) -->
+                    <div id="mGuest" class="flex items-center gap-2 px-2 pt-2">
+                        <a class="flex-1 px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700 text-center"
+                           asp-controller="Auth" asp-action="Login">Đăng nhập</a>
+                        <a class="flex-1 px-4 py-2 rounded-xl bg-brand text-white text-center"
+                           asp-controller="Auth" asp-action="Register">Đăng ký</a>
+                    </div>
+
+                    <!-- User actions (mobile) -->
+                    <div id="mUser" class="hidden items-center justify-between gap-2 px-2 pt-2">
+                        <span class="text-sm text-gray-600 dark:text-gray-300">Xin chào, <strong id="mUserName" class="font-semibold">User</strong></span>
+                        <button id="mBtnLogout" class="px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-700">Đăng xuất</button>
+                    </div>
                 </div>
             </div>
+
+
         </nav>
     </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
-    </div>
 
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2025 - HomeGarden_FE - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
+    <!-- Main -->
+    <main role="main" class="min-h-[60vh]">
+        @RenderBody()
+    </main>
+
+    <!-- Footer -->
+    <footer class="border-t border-gray-200 dark:border-gray-800">
+        <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 text-sm text-gray-500 dark:text-gray-400 flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div>© @DateTime.Now.Year HomeGarden. All rights reserved.</div>
+            <div class="flex items-center gap-4">
+                <a href="#" class="hover:text-brand">Điều khoản</a>
+                <a href="#" class="hover:text-brand">Chính sách</a>
+                <a href="mailto:support@homegarden.local" class="hover:text-brand">Hỗ trợ</a>
+            </div>
         </div>
     </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    @await RenderSectionAsync("Scripts", required: false)
+
+    @RenderSection("Scripts", required: false)
+
+    <script>
+        // Helper đọc user từ storage
+        function getStoredUser() {
+          try {
+            const raw = localStorage.getItem('hg_user') || sessionStorage.getItem('hg_user');
+            return raw ? JSON.parse(raw) : null;
+          } catch { return null; }
+        }
+        function getStoredToken() {
+          return localStorage.getItem('hg_token') || sessionStorage.getItem('hg_token') || null;
+        }
+        function showAuthUI() {
+          const hasToken = !!getStoredToken();
+          const user = getStoredUser();
+
+          const guest = document.getElementById('guestActions');
+          const userAct = document.getElementById('userActions');
+          const mGuest = document.getElementById('mGuest');
+          const mUser = document.getElementById('mUser');
+          const lnkAreasDesktop = document.getElementById('lnkAreasDesktop');
+            const lnkAreasMobile  = document.getElementById('lnkAreasMobile');
+               const lnkCareDesktop = document.getElementById('lnkCareDesktop');
+        const lnkCareMobile  = document.getElementById('lnkCareMobile');
+
+          if (hasToken) {
+            // fill name
+            const name = (user?.fullname || user?.fullName || user?.name || 'User').toString();
+            const u = document.getElementById('userName');
+            const mu = document.getElementById('mUserName');
+            if (u) u.textContent = name;
+            if (mu) mu.textContent = name;
+
+            // toggle
+            guest?.classList.add('hidden');
+            userAct?.classList.remove('hidden');
+            mGuest?.classList.add('hidden');
+            mUser?.classList.remove('hidden');
+               lnkCareDesktop?.classList.remove('hidden');
+        lnkCareMobile?.classList.remove('hidden');
+        lnkAreasDesktop?.classList.remove('hidden');
+        lnkAreasMobile?.classList.remove('hidden');
+
+          } else {
+            guest?.classList.remove('hidden');
+            userAct?.classList.add('hidden');
+            mGuest?.classList.remove('hidden');
+            mUser?.classList.add('hidden');
+               lnkCareDesktop?.classList.add('hidden');
+        lnkCareMobile?.classList.add('hidden');
+          }
+        }
+        function logoutAndRedirect() {
+          try {
+            localStorage.removeItem('hg_token');
+            localStorage.removeItem('hg_user');
+            sessionStorage.removeItem('hg_token');
+            sessionStorage.removeItem('hg_user');
+          } catch {}
+          // đổi route theo ý bạn:
+          window.location.href = '@Url.Action("Login", "Auth")';
+        }
+
+        // bind logout buttons
+        document.getElementById('btnLogout')?.addEventListener('click', logoutAndRedirect);
+        document.getElementById('mBtnLogout')?.addEventListener('click', logoutAndRedirect);
+
+        // init
+        showAuthUI();
+    </script>
+
 </body>
 </html>

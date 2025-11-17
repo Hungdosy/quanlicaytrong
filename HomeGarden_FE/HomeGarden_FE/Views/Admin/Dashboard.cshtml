@@ -1,0 +1,488 @@
+﻿@{
+    Layout = null;
+    ViewData["Title"] = "Admin Dashboard – Users CRUD & Plants View";
+}
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"]</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-50 text-gray-800">
+    <div class="max-w-7xl mx-auto px-6 py-8">
+        <h1 class="text-3xl font-bold text-emerald-700 mb-8">🌿 Admin Dashboard</h1>
+
+        <!-- ========================= -->
+        <!-- PLANTS: VIEW + SEARCH/FILTER -->
+        <!-- ========================= -->
+        <section class="mb-12">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold">Cây trồng</h2>
+                <div class="flex flex-col sm:flex-row gap-2 sm:items-center">
+                    <input id="plantSearch" placeholder="Tìm theo tên/giống..."
+                           class="border rounded-lg px-3 py-2 w-full sm:w-64" />
+                    <select id="plantStatus" class="border rounded-lg px-3 py-2">
+                        <option value="">— Tất cả trạng thái —</option>
+                        <option value="Growing">Growing</option>
+                        <option value="Harvested">Harvested</option>
+                        <option value="Dead">Dead</option>
+                    </select>
+                    <button id="btnPlantSearch" class="px-4 py-2 rounded bg-emerald-600 text-white hover:bg-emerald-700">
+                        Tìm
+                    </button>
+                    <button id="btnPlantReset" class="px-4 py-2 rounded border">Reset</button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto bg-white shadow rounded-2xl border border-gray-200">
+                <table class="min-w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                        <tr>
+                            <th class="px-4 py-2">#</th>
+                            <th class="px-4 py-2">Tên</th>
+                            <th class="px-4 py-2">Giống</th>
+                            <th class="px-4 py-2">Trạng thái</th>
+                            <th class="px-4 py-2">Sức khỏe</th>
+                            <th class="px-4 py-2">Ngày trồng</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tblPlants"></tbody>
+                </table>
+            </div>
+
+            <!-- pagination -->
+            <div class="flex items-center justify-between mt-3">
+                <div id="plantTotal" class="text-sm text-gray-600">—</div>
+                <div class="flex items-center gap-2">
+                    <button id="plantPrev" class="px-3 py-1 rounded border">Trước</button>
+                    <span id="plantPageInfo" class="text-sm"></span>
+                    <button id="plantNext" class="px-3 py-1 rounded border">Sau</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ========================= -->
+        <!-- USERS: FULL CRUD + EMAIL -->
+        <!-- ========================= -->
+        <section>
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-2xl font-semibold">Người dùng</h2>
+                <div class="flex flex-wrap gap-2">
+                    <button id="btnSendEmail" class="border border-emerald-300 text-emerald-700 px-4 py-2 rounded hover:bg-emerald-50">
+                        ✉ Gửi email
+                    </button>
+                    <button id="btnAddUser" class="bg-emerald-600 text-white px-4 py-2 rounded hover:bg-emerald-700">
+                        + Thêm user
+                    </button>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto bg-white shadow rounded-2xl border border-gray-200">
+                <table class="min-w-full text-sm text-left">
+                    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+                        <tr>
+                            <th class="px-3 py-2">
+                                <input type="checkbox" id="chkUserAll" />
+                            </th>
+                            <th class="px-4 py-2">#</th>
+                            <th class="px-4 py-2">Tên</th>
+                            <th class="px-4 py-2">Email</th>
+                            <th class="px-4 py-2">Vai trò</th>
+                            <th class="px-4 py-2">Trạng thái</th>
+                            <th class="px-4 py-2">Hành động</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tblUsers"></tbody>
+                </table>
+            </div>
+             
+            <!-- pagination (users) -->
+            <div class="flex items-center justify-between mt-3">
+                <div id="userTotal" class="text-sm text-gray-600">—</div>
+                <div class="flex items-center gap-2">
+                    <button id="userPrev" class="px-3 py-1 rounded border">Trước</button>
+                    <span id="userPageInfo" class="text-sm"></span>
+                    <button id="userNext" class="px-3 py-1 rounded border">Sau</button>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- MODAL dùng chung cho USERS -->
+    <div id="modal" class="fixed inset-0 bg-black/50 hidden justify-center items-center">
+        <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-lg">
+            <h3 id="modalTitle" class="text-xl font-semibold mb-4"></h3>
+            <form id="modalForm" class="space-y-3"></form>
+            <div class="flex justify-end gap-3 mt-4">
+                <button id="btnCancel" type="button" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Hủy</button>
+                <button id="btnSave" type="button" class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">Lưu</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODAL gửi email -->
+    <div id="emailModal" class="fixed inset-0 bg-black/50 hidden justify-center items-center">
+        <div class="bg-white p-6 rounded-xl shadow-xl w-full max-w-xl">
+            <h3 class="text-xl font-semibold mb-4">Gửi email thông báo</h3>
+            <div class="space-y-3">
+                <div>
+                    <label class="block text-sm font-medium mb-1">Template</label>
+                    <select id="emailTemplate" class="w-full border rounded px-3 py-2 text-sm">
+                        <option value="">— Không dùng template —</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Tiêu đề</label>
+                    <input id="emailSubject" class="w-full border rounded px-3 py-2 text-sm" />
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1">Nội dung</label>
+                    <textarea id="emailContent" rows="6" class="w-full border rounded px-3 py-2 text-sm"></textarea>
+                </div>
+                <div id="emailRecipientSummary" class="text-xs text-gray-500"></div>
+            </div>
+            <div class="flex justify-end gap-3 mt-4">
+                <button id="btnEmailCancel" type="button" class="px-4 py-2 bg-gray-200 rounded hover:bg-gray-300">Hủy</button>
+                <button id="btnEmailSend" type="button" class="px-4 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700">
+                    Gửi
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const token = localStorage.getItem("hg_token") || sessionStorage.getItem("hg_token");
+        const API_BASE = "https://localhost:7120/api";
+
+        // --------------- PLANTS (view + search/filter + pagination) ---------------
+        const PLANT_PAGE_SIZE = 10;
+        let plantPage = 1, plantTotal = 0, plantSize = PLANT_PAGE_SIZE;
+
+        function buildPlantQuery() {
+            const qs = new URLSearchParams();
+            qs.set("page", plantPage);
+            qs.set("size", PLANT_PAGE_SIZE);
+            const q = document.getElementById("plantSearch").value.trim();
+            const st = document.getElementById("plantStatus").value;
+            if (q) qs.set("search", q);
+            if (st) qs.set("status", st);
+            return qs.toString();
+        }
+
+        async function loadPlants() {
+            const tbody = document.getElementById("tblPlants");
+            tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-gray-500">Đang tải...</td></tr>`;
+
+            const res = await fetch(`${API_BASE}/plants?${buildPlantQuery()}`, {
+                headers: { "Authorization": "Bearer " + token, "Accept": "application/json" }
+            });
+            const body = await res.json().catch(() => ({}));
+            const data = body.data ?? body;
+
+            const items = data.items ?? [];
+            plantTotal = data.total ?? items.length ?? 0;
+            plantSize = data.size ?? PLANT_PAGE_SIZE;
+
+            if (!Array.isArray(items) || items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-3 text-gray-500">Không có cây nào</td></tr>`;
+            } else {
+                const indexStart = (plantPage - 1) * plantSize + 1;
+                tbody.innerHTML = items.map((p, i) => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-4 py-2">${indexStart + i}</td>
+                        <td class="px-4 py-2">${p.name}</td>
+                        <td class="px-4 py-2">${p.species ?? "—"}</td>
+                        <td class="px-4 py-2">${p.status}</td>
+                        <td class="px-4 py-2">${p.health ?? "—"}</td>
+                        <td class="px-4 py-2">${p.plantedDate ? new Date(p.plantedDate).toLocaleDateString("vi-VN") : "—"}</td>
+                    </tr>`).join("");
+            }
+
+            const maxPage = Math.max(1, Math.ceil(plantTotal / plantSize));
+            document.getElementById("plantTotal").textContent = `${plantTotal} cây`;
+            document.getElementById("plantPageInfo").textContent = `Trang ${plantPage} / ${maxPage}`;
+            document.getElementById("plantPrev").disabled = plantPage <= 1;
+            document.getElementById("plantNext").disabled = plantPage >= maxPage;
+        }
+
+        document.getElementById("btnPlantSearch").onclick = () => { plantPage = 1; loadPlants(); };
+        document.getElementById("btnPlantReset").onclick = () => {
+            document.getElementById("plantSearch").value = "";
+            document.getElementById("plantStatus").value = "";
+            plantPage = 1;
+            loadPlants();
+        };
+        document.getElementById("plantPrev").onclick = () => { if (plantPage > 1) { plantPage--; loadPlants(); } };
+        document.getElementById("plantNext").onclick = () => { plantPage++; loadPlants(); };
+
+
+        // --------------- USERS (CRUD + pagination) ---------------
+        const USER_PAGE_SIZE = 10;
+        let userPage = 1, userTotal = 0, userSize = USER_PAGE_SIZE;
+
+        async function loadUsers() {
+            const tbody = document.getElementById("tblUsers");
+            tbody.innerHTML = `<tr><td colspan="7" class="text-center py-3 text-gray-500">Đang tải...</td></tr>`;
+
+            const res = await fetch(`${API_BASE}/users?page=${userPage}&size=${USER_PAGE_SIZE}`, {
+                headers: { "Authorization": "Bearer " + token, "Accept": "application/json" }
+            });
+            const body = await res.json().catch(() => ({}));
+            const data = body.data ?? body;
+
+            const items = data.items ?? [];
+            userTotal = data.total ?? items.length ?? 0;
+            userSize = data.size ?? USER_PAGE_SIZE;
+
+            if (!Array.isArray(items) || items.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="7" class="text-center py-3 text-gray-500">Không có người dùng nào</td></tr>`;
+            } else {
+                const indexStart = (userPage - 1) * userSize + 1;
+                tbody.innerHTML = items.map((u, i) => `
+                    <tr class="border-b hover:bg-gray-50">
+                        <td class="px-3 py-2">
+                            <input type="checkbox" class="chkUser" data-id="${u.userId}" />
+                        </td>
+                        <td class="px-4 py-2">${indexStart + i}</td>
+                        <td class="px-4 py-2">${u.fullname}</td>
+                        <td class="px-4 py-2">${u.email}</td>
+                        <td class="px-4 py-2">${u.roleName}</td>
+                        <td class="px-4 py-2">${u.status}</td>
+                        <td class="px-4 py-2 flex gap-2">
+                            <button onclick="editUser(${u.userId})" class="text-blue-600 hover:underline">Sửa</button>
+                            <button onclick="deleteUser(${u.userId})" class="text-red-600 hover:underline">Xóa</button>
+                        </td>
+                    </tr>`).join("");
+            }
+
+            const maxPage = Math.max(1, Math.ceil(userTotal / userSize));
+            document.getElementById("userTotal").textContent = `${userTotal} người dùng`;
+            document.getElementById("userPageInfo").textContent = `Trang ${userPage} / ${maxPage}`;
+            document.getElementById("userPrev").disabled = userPage <= 1;
+            document.getElementById("userNext").disabled = userPage >= maxPage;
+
+            // reset ô chọn tất cả
+            const chkAll = document.getElementById("chkUserAll");
+            if (chkAll) chkAll.checked = false;
+        }
+
+        document.getElementById("userPrev").onclick = () => { if (userPage > 1) { userPage--; loadUsers(); } };
+        document.getElementById("userNext").onclick = () => { userPage++; loadUsers(); };
+
+        // --------------- SELECT ALL USERS FOR EMAIL ---------------
+        document.getElementById("chkUserAll").onchange = (e) => {
+            const checked = e.target.checked;
+            document.querySelectorAll(".chkUser").forEach(chk => chk.checked = checked);
+        };
+
+        function getSelectedUserIds() {
+            return Array.from(document.querySelectorAll(".chkUser:checked"))
+                .map(chk => parseInt(chk.dataset.id));
+        }
+
+        // --------------- USER MODAL + CRUD ---------------
+        const modal = document.getElementById("modal");
+        const modalForm = document.getElementById("modalForm");
+        const btnCancel = document.getElementById("btnCancel");
+        const btnSave = document.getElementById("btnSave");
+        let editingUserId = null;
+
+        function openUserModal(title, fields, data = {}) {
+            document.getElementById("modalTitle").textContent = title;
+            modalForm.innerHTML = fields.map(f => `
+                <div>
+                    <label class="block text-sm font-medium mb-1">${f.label}</label>
+                    <input name="${f.name}" value="${data[f.name] ?? ''}" class="w-full border rounded px-3 py-2" ${f.type ? `type="${f.type}"` : ""} />
+                </div>`).join("");
+            modal.classList.remove("hidden");
+            modal.classList.add("flex");
+        }
+        btnCancel.onclick = () => { modal.classList.add("hidden"); modal.classList.remove("flex"); };
+
+        // Create
+        document.getElementById("btnAddUser").onclick = () => {
+            editingUserId = null;
+            openUserModal("Thêm người dùng", [
+                { name: "fullname", label: "Họ tên" },
+                { name: "email", label: "Email", type: "email" },
+                { name: "password", label: "Mật khẩu", type: "password" },
+                { name: "roleId", label: "Role ID (1=Admin, 2=User, 3=Technician)" },
+                { name: "phone", label: "SĐT (tuỳ chọn)" }
+            ]);
+        };
+
+        // Edit
+        async function editUser(id) {
+            editingUserId = id;
+            const res = await fetch(`${API_BASE}/users/${id}`, { headers: { "Authorization": "Bearer " + token } });
+            const data = await res.json();
+            const u = data.data;
+            openUserModal("Cập nhật người dùng", [
+                { name: "fullname", label: "Họ tên" },
+                { name: "phone", label: "SĐT" }
+            ], u);
+        }
+        window.editUser = editUser; // để onclick dùng được
+
+        // Delete
+        async function deleteUser(id) {
+            if (!confirm("Xác nhận xóa user này?")) return;
+            await fetch(`${API_BASE}/users/${id}`, {
+                method: "DELETE",
+                headers: { "Authorization": "Bearer " + token }
+            });
+            await loadUsers();
+        }
+        window.deleteUser = deleteUser;
+
+        // Save user (create / update)
+        btnSave.onclick = async () => {
+            const form = Object.fromEntries(new FormData(modalForm).entries());
+
+            if (editingUserId) {
+                const payload = {};
+                if (form.fullname) payload.fullname = form.fullname;
+                if (form.phone) payload.phone = form.phone;
+
+                await fetch(`${API_BASE}/users/${editingUserId}`, {
+                    method: "PATCH",
+                    headers: {
+                        "Authorization": "Bearer " + token,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+            } else {
+                const payload = {
+                    fullname: form.fullname ?? "",
+                    email: form.email ?? "",
+                    password: form.password ?? "",
+                    roleId: parseInt(form.roleId) || 2,
+                    phone: form.phone || null
+                };
+                await fetch(`${API_BASE}/users`, {
+                    method: "POST",
+                    headers: {
+                        "Authorization": "Bearer " + token,
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(payload)
+                });
+            }
+
+            modal.classList.add("hidden");
+            modal.classList.remove("flex");
+            await loadUsers();
+        };
+
+
+        // --------------- EMAIL MODAL + SEND ---------------
+        const emailModal = document.getElementById("emailModal");
+        const emailTemplateSelect = document.getElementById("emailTemplate");
+        const emailSubjectInput = document.getElementById("emailSubject");
+        const emailContentInput = document.getElementById("emailContent");
+        const emailRecipientSummary = document.getElementById("emailRecipientSummary");
+        let selectedUserIdsForEmail = [];
+
+        document.getElementById("btnSendEmail").onclick = async () => {
+            const ids = getSelectedUserIds();
+            if (!ids.length) {
+                alert("Hãy chọn ít nhất 1 người dùng để gửi email.");
+                return;
+            }
+            selectedUserIdsForEmail = ids;
+            emailRecipientSummary.textContent = `Sẽ gửi email cho ${ids.length} người dùng được chọn.`;
+
+            emailSubjectInput.value = "";
+            emailContentInput.value = "";
+
+            await loadEmailTemplates();
+
+            emailModal.classList.remove("hidden");
+            emailModal.classList.add("flex");
+        };
+
+        document.getElementById("btnEmailCancel").onclick = () => {
+            emailModal.classList.add("hidden");
+            emailModal.classList.remove("flex");
+        };
+
+        async function loadEmailTemplates() {
+            emailTemplateSelect.innerHTML = `<option value="">— Không dùng template —</option>`;
+            const res = await fetch(`${API_BASE}/emails/templates`, {
+                headers: { "Authorization": "Bearer " + token, "Accept": "application/json" }
+            });
+            const body = await res.json().catch(() => ({}));
+            const templates = body.data ?? body ?? [];
+
+            if (Array.isArray(templates)) {
+                templates.forEach(t => {
+                    const opt = document.createElement("option");
+                    opt.value = t.templateId;
+                    opt.textContent = `${t.code} – ${t.subject}`;
+                    opt.dataset.subject = t.subject || "";
+                    opt.dataset.description = t.description || "";
+                    emailTemplateSelect.appendChild(opt);
+                });
+            }
+        }
+
+        emailTemplateSelect.onchange = (e) => {
+            const opt = e.target.selectedOptions[0];
+            if (!opt || !opt.value) return;
+            if (!emailSubjectInput.value) emailSubjectInput.value = opt.dataset.subject || "";
+            if (!emailContentInput.value) emailContentInput.value = opt.dataset.description || "";
+        };
+
+        document.getElementById("btnEmailSend").onclick = async () => {
+            if (!selectedUserIdsForEmail.length) {
+                alert("Không có người nhận.");
+                return;
+            }
+            const subject = emailSubjectInput.value.trim();
+            const content = emailContentInput.value.trim();
+            const templateIdStr = emailTemplateSelect.value;
+
+            if (!subject || !content) {
+                alert("Vui lòng nhập tiêu đề và nội dung email.");
+                return;
+            }
+
+            const payload = {
+                userIds: selectedUserIdsForEmail,
+                subject: subject,
+                content: content,
+                templateId: templateIdStr ? parseInt(templateIdStr) : null
+            };
+
+            const res = await fetch(`${API_BASE}/emails/send`, {
+                method: "POST",
+                headers: {
+                    "Authorization": "Bearer " + token,
+                    "Content-Type": "application/json",
+                    "Accept": "application/json"
+                },
+                body: JSON.stringify(payload)
+            });
+
+            const body = await res.json().catch(() => ({}));
+            if (res.ok && body.success !== false) {
+                alert(body.message || "Đã gửi email thông báo.");
+                emailModal.classList.add("hidden");
+                emailModal.classList.remove("flex");
+            } else {
+                alert(body.message || "Lỗi khi gửi email.");
+            }
+        };
+
+
+        // --------------- INIT ---------------
+        document.addEventListener("DOMContentLoaded", async () => {
+            await Promise.all([loadPlants(), loadUsers()]);
+        });
+    </script>
+</body>
+</html>
+//aa

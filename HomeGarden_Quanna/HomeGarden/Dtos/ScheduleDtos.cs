@@ -17,7 +17,9 @@
         public string TaskType { get; set; } = string.Empty;
         public string Frequency { get; set; } = "daily";
         public DateTime NextDue { get; set; }
+        public int Count { get; set; } = 1; 
     }
+
 
     public class ScheduleDoneDto
     {
